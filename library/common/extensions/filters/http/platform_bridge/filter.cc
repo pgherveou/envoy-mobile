@@ -6,6 +6,7 @@
 #include "common/common/utility.h"
 
 #include "library/common/api/external.h"
+#include "library/common/buffer/bridge_fragment.h"
 #include "library/common/buffer/utility.h"
 #include "library/common/http/header_utility.h"
 
@@ -27,6 +28,20 @@ Http::FilterHeadersStatus mapStatus(envoy_filter_headers_status_t status) {
   default:
     ASSERT(false, fmt::format("unrecognized filter status from platform: {}", status));
     return Http::FilterHeadersStatus::Continue;
+  }
+}
+
+Http::FilterDataStatus mapStatus(envoy_filter_data_status_t status) {
+  switch (status) {
+  case ENVOY_FILTER_DATA_STATUS_CONTINUE:
+    return Http::FilterDataStatus::Continue;
+  case ENVOY_FILTER_DATA_STATUS_STOP_ITERATION_AND_BUFFER:
+    return Http::FilterDataStatus::StopIterationAndBuffer;
+  case ENVOY_FILTER_DATA_STATUS_STOP_ITERATION_NO_BUFFER:
+    return Http::FilterDataStatus::StopIterationNoBuffer;
+  default:
+    ASSERT(false, fmt::format("urecognized filter status from platform: {}", status));
+    return Http::FilterDataStatus::Continue;
   }
 }
 
@@ -63,15 +78,39 @@ Http::FilterHeadersStatus PlatformBridgeFilter::onHeaders(Http::HeaderMap& heade
   return status;
 }
 
+Http::FilterDataStatus PlatformBridgeFilter::onData(Buffer::Instance& data, bool end_stream,
+                                                    envoy_filter_on_data_f on_data) {
+  // Allow nullptr to act as (optimized) no-op.
+  if (on_data == nullptr) {
+    return Http::FilterDataStatus::Continue;
+  }
+
+  envoy_data in_data = Buffer::Utility::toBridgeData(data);
+  envoy_filter_data_status result =
+      on_data(in_data, end_stream, platform_filter_->context);
+  Http::FilterDataStatus status = mapStatus(result.status);
+  // Current platform implementations expose immutable data, thus any modification necessitates a
+  // full copy. If the returned buffer is identical, we assume no modification was made and elide
+  // the copy here. See also https://github.com/lyft/envoy-mobile/issues/949 for potential future
+  // optimization.
+  if (in_data.bytes != result.data.bytes) {
+    data.drain(data.length());
+    data.addBufferFragment(*Buffer::BridgeFragment::createBridgeFragment(result.data));
+  }
+
+  return status;
+}
+
 Http::FilterHeadersStatus PlatformBridgeFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                               bool end_stream) {
   // Delegate to shared implementation for request and response path.
   return onHeaders(headers, end_stream, platform_filter_->on_request_headers);
 }
 
-Http::FilterDataStatus PlatformBridgeFilter::decodeData(Buffer::Instance& /*data*/,
-                                                        bool /*end_stream*/) {
-  return Http::FilterDataStatus::Continue;
+Http::FilterDataStatus PlatformBridgeFilter::decodeData(Buffer::Instance& data,
+                                                        bool end_stream) {
+  // Delegate to shared implementation for request and response path.
+  return onData(data, end_stream, platform_filter_->on_request_data);
 }
 
 Http::FilterTrailersStatus
@@ -94,9 +133,10 @@ Http::FilterHeadersStatus PlatformBridgeFilter::encodeHeaders(Http::ResponseHead
   return onHeaders(headers, end_stream, platform_filter_->on_response_headers);
 }
 
-Http::FilterDataStatus PlatformBridgeFilter::encodeData(Buffer::Instance& /*data*/,
-                                                        bool /*end_stream*/) {
-  return Http::FilterDataStatus::Continue;
+Http::FilterDataStatus PlatformBridgeFilter::encodeData(Buffer::Instance& data,
+                                                        bool end_stream) {
+  // Delegate to shared implementation for request and response path.
+  return onData(data, end_stream, platform_filter_->on_response_data);
 }
 
 Http::FilterTrailersStatus

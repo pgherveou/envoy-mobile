@@ -77,11 +77,9 @@ static_resources:
         "@type": type.googleapis.com/envoy.extensions.clusters.dynamic_forward_proxy.v3.ClusterConfig
         dns_cache_config: *dns_cache_config
     transport_socket: &base_transport_socket
-      name: envoy.transport_sockets.tls
+      name: envoy.transport_sockets.raw_buffer
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
-        common_tls_context:
-          validation_context: {}
     upstream_connection_options: &upstream_opts
       tcp_keepalive:
         keepalive_interval: 10

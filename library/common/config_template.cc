@@ -78,8 +78,6 @@ static_resources:
         dns_cache_config: *dns_cache_config
     transport_socket: &base_transport_socket
       name: envoy.transport_sockets.raw_buffer
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
     upstream_connection_options: &upstream_opts
       tcp_keepalive:
         keepalive_interval: 10

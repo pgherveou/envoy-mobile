@@ -2,8 +2,8 @@ import Envoy
 import UIKit
 
 private let kCellID = "cell-id"
-private let kRequestAuthority = "api.lyft.com"
-private let kRequestPath = "/ping"
+private let kRequestAuthority = "www.google.com"
+private let kRequestPath = "/"
 private let kRequestScheme = "https"
 
 final class ViewController: UITableViewController {
@@ -15,7 +15,7 @@ final class ViewController: UITableViewController {
     super.viewDidLoad()
     do {
       NSLog("starting Envoy...")
-      self.client = try StreamClientBuilder().build()
+      self.client = try StreamClientBuilder().addLogLevel(.trace).build()
     } catch let error {
       NSLog("starting Envoy failed: \(error)")
     }

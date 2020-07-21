@@ -41,7 +41,7 @@ static_resources:
               "@type": type.googleapis.com/envoy.extensions.filters.http.dynamic_forward_proxy.v3.FilterConfig
               dns_cache_config: &dns_cache_config
                 name: dynamic_forward_proxy_cache_config
-                dns_lookup_family: AUTO
+                dns_lookup_family: V4_ONLY
                 dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
                 dns_failure_refresh_rate:
                   base_interval: {{ dns_failure_refresh_rate_seconds_base }}s
@@ -79,15 +79,9 @@ static_resources:
     transport_socket: &base_transport_socket
       name: envoy.transport_sockets.tls
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
         common_tls_context:
-          validation_context:
-            trusted_ca:
-              inline_string: |
-)"
-#include "certificates.inc"
-
-                              R"(
+          validation_context: {}
     upstream_connection_options: &upstream_opts
       tcp_keepalive:
         keepalive_interval: 10
